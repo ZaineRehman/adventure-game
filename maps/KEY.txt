@@ -1,0 +1,41 @@
+A0  A3 A1 A2 xx
+A1  A4 B1 B4 A0
+A2  A0 ?3 E2 xx
+A3  F1 xx A0 xx
+A4  A5 xx A1 xx
+A5  xx ?1 A4 xx
+
+B1  B3 C1 B2 A1
+B2  B1 C3 C4 B4
+B3  F3 xx B1 B5
+B4  A1 B2 E1 xx
+B5  ?1 B3 xx xx
+
+C1  D1 xx C3 B1
+C2  xx G2 G1 xx
+C3  C1 G1 xx B2
+C4  B2 C5 ?2 xx
+C5  xx G4 xx C4
+
+D1  xx D2 C1 F3
+D2  xx xx G2 D1
+
+E1  B4 xx E3 E2
+E2  A2 E1 E4 xx
+E3  E1 xx xx xx
+E4  E2 xx xx xx
+
+F1  xx F2 A3 xx
+F2  xx F3 xx F1
+F3  xx D1 B3 F2
+
+G1  C2 xx xx C3
+G2  D2 xx G3 C2
+G3  G2 xx G4 xx
+G4  G3 xx G5 C5
+G5  G4 xx xx ?4
+
+?1  xx xx B5 A5
+?2  C4 xx xx xx
+?3  xx xx xx A2
+?4  xx G5 xx xx
