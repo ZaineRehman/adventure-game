@@ -4,7 +4,12 @@
  * 
  * started 10/10/2024
  * 
+ * last changed 8/29/2025
  * 
+ * 
+ * check comments with "DEBUG" btw
+ * i am so sorry for how horribly messy this file is
+ * (no im not)
  */
 
 #include <iostream>
@@ -35,16 +40,7 @@
 // time between frames in ms (default 50ms)
 constexpr int FRAME_DELAY = 50;
 
-// show debug info?
-#ifdef _WIN32
-	constexpr bool DEBUG_INFO = false;
-#else
-	constexpr bool DEBUG_INFO = true;
-#endif
-
-// map size
-int MAP_X = 0;
-int MAP_Y = 0;
+constexpr bool DEBUG_INFO = false;
 
 // cheats (for debugging ofc)
 bool CHEATS_NODIE = false;
@@ -55,6 +51,16 @@ bool CHEATS_NODIE = false;
 #else
 	constexpr int CLEAR_MODE = 2;
 #endif
+
+constexpr bool USE_NEW_INPUT_MODE = true;
+
+// every X amount of frames, follow through with input (kind of not really)
+// could technically be bypassed by spamming the button but no way anyones doing that
+constexpr int INPUT_FRAMES = 2;
+
+// map size
+int MAP_X = 0;
+int MAP_Y = 0;
 
 // key lookup table for every zone with a key
 /*
@@ -82,7 +88,13 @@ std::vector<std::pair<std::string,int>> KEY_LOOKUP {
 const std::vector<std::string> KEY_LOOKUP_ZONES {"B","C","D","E","F","G","?1","?2","?3","?4"};
 
 // stores if theres a coin in a zone or not
-std::vector<std::pair<std::string,bool>> ZONE_COINS {};
+// (only put zones in here that have a coin at the start)
+std::vector<std::pair<std::string,bool>> ZONE_COINS {
+	{"A0", true}, {"A1", true}, {"A2", true}, 
+	{"A3", true}, {"A4", true}, {"A5", true}, 
+	{"B1" ,true}, {"B2", true}, {"B3", true}, 
+	{"C2", true}, {"C3", true}, 
+};
 
 // holds all adjacent rooms to the current room
 std::vector<std::string> ADJACENT_ZONES {};
@@ -92,6 +104,15 @@ std::atomic<int> KEY(-1);
 // for keys that store multiple things on the input buffer at once
 std::atomic<int> KEY2(-1);
 std::atomic<int> KEY3(-1);
+
+// for new input method
+int8_t
+	KEY_UP    = -1, 
+	KEY_DOWN  = -1, 
+	KEY_LEFT  = -1, 
+	KEY_RIGHT = -1,
+	KEY_Q     = -1, 
+	KEY_ESC   = -1;
 
 bool QUIT = false;
 
@@ -111,10 +132,10 @@ void ShowConsoleCursor(bool showFlag) {
 #endif
 
 // very cool clear screen
-inline void clear(uint8_t type = 3, uint16_t newLineCharNum = 72) {
+inline void clear(uint8_t type = 3, uint16_t newLineNum = 72) {
 	switch (type) {
 		case 0:
-			for (uint16_t i = 0; i <= newLineCharNum; ++i) std::cout << '\n';
+			for (uint16_t i = 0; i <= newLineNum; ++i) std::cout << '\n';
 			break;
 
 		case 1:
@@ -126,7 +147,7 @@ inline void clear(uint8_t type = 3, uint16_t newLineCharNum = 72) {
 			break;
 
 		case 2:
-			std::cout<<"\e[1;1H\e[2J";
+			std::cout<<"\033[1;1H\033[2J";
 			break;
 		
 		#ifdef _WIN32
@@ -186,82 +207,82 @@ inline void clear(uint8_t type = 3, uint16_t newLineCharNum = 72) {
 
 // does not work
 /*inline void cursor(bool show) {
-	std::cout << show ? "\e[?25h" : "\e[?25l";
+	std::cout << show ? "\033[?25h" : "\033[?25l";
 }*/
 
 namespace Colors {
 	const std::string
-		reset = "\e[0m",
+		reset = "\033[0m",
 		
-		bold          = "\e[1m",
-		italic        = "\e[3m",
-		underline     = "\e[4m",
-		strikethrough = "\e[9m",
-		mystery1      = "\e[31m",
+		bold          = "\033[1m",
+		italic        = "\033[3m",
+		underline     = "\033[4m",
+		strikethrough = "\033[9m",
+		mystery1      = "\033[31m",
 		mystery2      = "\x1B[31m",
 		
-		black  = "\e[0;30m",
-		red    = "\e[0;31m",
-		green  = "\e[0;32m",
-		yellow = "\e[0;33m",
-		blue   = "\e[0;34m",
-		purple = "\e[0;35m",
-		cyan   = "\e[0;36m",
-		white  = "\e[0;37m",
+		black  = "\033[0;30m",
+		red    = "\033[0;31m",
+		green  = "\033[0;32m",
+		yellow = "\033[0;33m",
+		blue   = "\033[0;34m",
+		purple = "\033[0;35m",
+		cyan   = "\033[0;36m",
+		white  = "\033[0;37m",
 		
-		black_bold  = "\e[1;30m",
-        red_bold    = "\e[1;31m",
-        green_bold  = "\e[1;32m",
-        yellow_bold = "\e[1;33m",
-        blue_bold   = "\e[1;34m",
-        purple_bold = "\e[1;35m",
-        cyan_bold   = "\e[1;36m",
-        white_bold  = "\e[1;37m",
+		black_bold  = "\033[1;30m",
+        red_bold    = "\033[1;31m",
+        green_bold  = "\033[1;32m",
+        yellow_bold = "\033[1;33m",
+        blue_bold   = "\033[1;34m",
+        purple_bold = "\033[1;35m",
+        cyan_bold   = "\033[1;36m",
+        white_bold  = "\033[1;37m",
         
-        black_underline  = "\e[4;30m",
-        red_underline    = "\e[4;31m",
-        green_underline  = "\e[4;32m",
-        yellow_underline = "\e[4;33m",
-        blue_underline   = "\e[4;34m",
-        purple_underline = "\e[4;35m",
-        cyan_underline   = "\e[4;36m",
-        white_underline  = "\e[4;37m",
+        black_underline  = "\033[4;30m",
+        red_underline    = "\033[4;31m",
+        green_underline  = "\033[4;32m",
+        yellow_underline = "\033[4;33m",
+        blue_underline   = "\033[4;34m",
+        purple_underline = "\033[4;35m",
+        cyan_underline   = "\033[4;36m",
+        white_underline  = "\033[4;37m",
         
-        black_background  = "\e[40m",
-        red_background    = "\e[41m",
-        green_background  = "\e[42m",
-        yellow_background = "\e[43m",
-        blue_background   = "\e[44m",
-        purple_background = "\e[45m",
-        cyan_background   = "\e[46m",
-        white_background  = "\e[47m",
+        black_background  = "\033[40m",
+        red_background    = "\033[41m",
+        green_background  = "\033[42m",
+        yellow_background = "\033[43m",
+        blue_background   = "\033[44m",
+        purple_background = "\033[45m",
+        cyan_background   = "\033[46m",
+        white_background  = "\033[47m",
         
-        black_highIntensity  = "\e[0;90m",
-        red_highIntensity    = "\e[0;91m",
-        green_highIntensity  = "\e[0;92m",
-        yellow_highIntensity = "\e[0;93m",
-        blue_highIntensity   = "\e[0;94m",
-        purple_highIntensity = "\e[0;95m",
-        cyan_highIntensity   = "\e[0;96m",
-        white_highIntensity  = "\e[0;97m",
+        black_highIntensity  = "\033[0;90m",
+        red_highIntensity    = "\033[0;91m",
+        green_highIntensity  = "\033[0;92m",
+        yellow_highIntensity = "\033[0;93m",
+        blue_highIntensity   = "\033[0;94m",
+        purple_highIntensity = "\033[0;95m",
+        cyan_highIntensity   = "\033[0;96m",
+        white_highIntensity  = "\033[0;97m",
         
-        black_boldHighIntensity  = "\e[1;90m",
-        red_boldHighIntensity    = "\e[1;91m",
-        green_boldHighIntensity  = "\e[1;92m",
-        yellow_boldHighIntensity = "\e[1;93m",
-        blue_boldHighIntensity   = "\e[1;94m",
-        purple_boldHighIntensity = "\e[1;95m",
-        cyan_boldHighIntensity   = "\e[1;96m",
-        white_boldHighIntensity  = "\e[1;97m",
+        black_boldHighIntensity  = "\033[1;90m",
+        red_boldHighIntensity    = "\033[1;91m",
+        green_boldHighIntensity  = "\033[1;92m",
+        yellow_boldHighIntensity = "\033[1;93m",
+        blue_boldHighIntensity   = "\033[1;94m",
+        purple_boldHighIntensity = "\033[1;95m",
+        cyan_boldHighIntensity   = "\033[1;96m",
+        white_boldHighIntensity  = "\033[1;97m",
         
-        black_backgroundHighIntensity  = "\e[0;100m",
-        red_backgroundHighIntensity    = "\e[0;101m",
-        green_backgroundHighIntensity  = "\e[0;102m",
-        yellow_backgroundHighIntensity = "\e[0;103m",
-        blue_backgroundHighIntensity   = "\e[0;104m",
-        purple_backgroundHighIntensity = "\e[0;105m",
-        cyan_backgroundHighIntensity   = "\e[0;106m",
-        white_backgroundHighIntensity  = "\e[0;107m";
+        black_backgroundHighIntensity  = "\033[0;100m",
+        red_backgroundHighIntensity    = "\033[0;101m",
+        green_backgroundHighIntensity  = "\033[0;102m",
+        yellow_backgroundHighIntensity = "\033[0;103m",
+        blue_backgroundHighIntensity   = "\033[0;104m",
+        purple_backgroundHighIntensity = "\033[0;105m",
+        cyan_backgroundHighIntensity   = "\033[0;106m",
+        white_backgroundHighIntensity  = "\033[0;107m";
 };
 
 void inputHelper() {
@@ -295,6 +316,7 @@ void inputHelper() {
 	return;
 }
 
+// DEBUG: useless function never used
 void fillMap(char chr) {
 	for (int i = 0; i < MAP_Y; ++i) {
 		for (int x = 0; x < MAP_X; ++x) {
@@ -326,7 +348,7 @@ struct Player {
 	std::string zone; // accepted defeat
 }; // theres literally only 1 of these i dont need to have it properly aligned
 
-// DEBUGGING!
+// DEBUG GING!
 class Cheats {
 public:
 	Player* currentPlayer;
@@ -424,7 +446,7 @@ std::vector<std::string> adjacentZones(const std::string& zone) {
 	}
 	
 	if (DEBUG_INFO) std::cout << "adjacentZones: BEFORE LOADING FILE\n";
-	std::ifstream file("maps/KEY.txt");
+	std::ifstream file("zones/KEY.txt");
 	if (DEBUG_INFO) std::cout << "adjacentZones: AFTER LOADING FILE\n";
 	std::string line;
 	
@@ -473,7 +495,7 @@ std::vector<std::string> adjacentZones(const std::string& zone) {
   * ' ' or . = empty
   *        X = wall
   * 
-  * MINIMUM MAP SIZE IS 7x4 IDK PROBABLY
+  * MINIMUM MAP SIZE IS 7x4 PROBABLY
   * 
   */
 
@@ -484,13 +506,13 @@ void loadMap(const Player& player) {
 	#endif
 
 	std::stringstream fileName;
-	fileName << "maps/" << player.zone << ".txt";
+	fileName << "zones/" << player.zone << ".txt";
 	if (DEBUG_INFO) std::cout << "loadMap: opening file\n";
 	std::ifstream mapFile(fileName.str());
 	if (DEBUG_INFO) std::cout << "loadMap: file opened\n"; // segfault passed here
 	
 	std::string line;
-	int mapX, mapY;
+	int mapX = 0, mapY = 0;
 	int lineNum = 0;
 	int mapLine = 0;
 	std::vector<std::vector<char>> loadedMap {};
@@ -596,7 +618,7 @@ void loadMap(const Player& player) {
 		
 		MAP = loadedMap;
 	}
-	// else ahg... fack
+	// else: ahg... fack
 	else {
 		std::cout << Colors::red_boldHighIntensity << "Failed to open file: " << fileName.str() << Colors::reset << '\n';
 	}
@@ -694,13 +716,22 @@ void showMap(const Player& player) {
 		lines.push_back(line);
 	}
 	mapFile.close();
+	
+	// for Q input checking
+	bool firstTime = true;
 
 	while (1) {
 		clear(CLEAR_MODE);
-		if (KEY == 113) break;
+		if (!USE_NEW_INPUT_MODE && KEY == 113) break;
+		else if (USE_NEW_INPUT_MODE) {
+			// if still holding Q from initial press, ignore
+			if (GetAsyncKeyState('Q') & 0x8000 && !firstTime) {
+				break;
+			} else if (KEY_Q) { KEY_Q = 0; firstTime = false; }
+		}
 
 		std::stringstream atEnd {};
-		for (const std::string i : lines) {
+		for (const std::string& i : lines) {
 			std::string color = "";
 			int index = 0;
 			for (const char x : i) {
@@ -711,7 +742,7 @@ void showMap(const Player& player) {
 					continue;
 				}
 				if ((x >= 'A' && x <= 'G') || (x == '?')) {
-					char nextToCheck = i[index+1];
+					//char nextToCheck = i[index+1];
 					if (x == player.zone[0] && i[index+1] == player.zone[1]) {
 						color = zoneColor(std::string(1,x),true);
 					}
@@ -734,6 +765,7 @@ void showMap(const Player& player) {
 
 int main() {
 	srand(time(0));
+	//std::ios_base::sync_with_stdio(false);
 
 	// soloud engine
 	SoLoud::Soloud* SOLOUD_ENGINE = new SoLoud::Soloud;
@@ -743,16 +775,15 @@ int main() {
 	bgMusic->load("audio/music/zones_D.wav");
 	bgMusic->setLooping(true);
 
-	//int bgMusicHandle = SOLOUD_ENGINE->play(*bgMusic,0);
+	int bgMusicHandle = SOLOUD_ENGINE->play(*bgMusic,0);
 	//SOLOUD_ENGINE->fadeVolume(bgMusicHandle,1,10);
-
+	
 	#ifdef _WIN32
-		// cuz the windows clear i have lowkey sucks balls
-		//clear(1);
 		ShowConsoleCursor(false);
 
 		// complicated ahh stuff i probably dont need (changing terminal modes)
 		// lowkey dont even work but whatever
+		// ^ why did i say this ?? ^
 		HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE); 
 		DWORD mode = 0;
 		GetConsoleMode(hStdin, &mode);
@@ -774,6 +805,7 @@ int main() {
 	// yay
 	std::thread(inputHelper).detach();
 
+	// DEBUG: do i even need this
 	fillMap(' ');
 	//int16_t x, y, inventory, blit, coins, checkpoint, zone
 	Player PLAYER {1,1,0,'@',0,"A0","A0"};
@@ -785,20 +817,6 @@ int main() {
 	
 	loadMap(PLAYER);
 	//std::cout << MAP_X << "," << MAP_Y << '\n';
-
-	// input debugger
-	while(0) if (KEY != -1) {
-		std::cout << KEY << '\n'; 
-		if (KEY2 != -1) {
-			std::cout << '\t' << KEY2 << '\n';
-			KEY2 = -1;
-			if (KEY3 != -1) {
-				std::cout << "\t\t" << KEY3 << '\n';
-				KEY3 = -1;
-			}
-		}
-		KEY = -1;
-	}
 	
 	// guess what this is for
 	std::stringstream debugText {};
@@ -812,7 +830,8 @@ int main() {
 		int wantX = 0;
 		int wantY = 0;
 		
-		if (KEY != -1) {
+		if (!USE_NEW_INPUT_MODE && KEY != -1) {
+			// holy fuck this is a syntax nightmare
 			switch (KEY) {
 			#ifdef _WIN32
 				case 27: QUIT = true; break;
@@ -886,20 +905,62 @@ int main() {
 			KEY2 = -1;
 			KEY3 = -1;
 		}
+		// only check input every other frame
+		else if (USE_NEW_INPUT_MODE /*&& framecounter%2*/) {
+			#ifdef _WIN32
+				// esc
+				if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) QUIT = true;
+				// Q
+				if (GetAsyncKeyState('Q') & 0x8000) {
+					KEY_Q = 1;
+					showMap(PLAYER);
+				}
+				// up
+				if (GetAsyncKeyState(VK_UP) & 0x8000) {
+					KEY_UP++;
+					if (KEY_UP == 1.5*INPUT_FRAMES-1) { wantY--; KEY_UP = 0; } // up and down should be slower
+					else if (!KEY_UP) wantY--; // move immediately on first input
+				}
+				else if (KEY_UP > -1) KEY_UP = -1;
+				// down
+				if (GetAsyncKeyState(VK_DOWN) & 0x8000) {
+					KEY_DOWN++;
+					if (KEY_DOWN == 1.5*INPUT_FRAMES-1) { wantY++; KEY_DOWN = 0; }
+					else if (!KEY_DOWN) wantY++;
+				}
+				else if (KEY_DOWN > -1) KEY_DOWN = -1;
+				// left
+				if (GetAsyncKeyState(VK_LEFT) & 0x8000) {
+					KEY_LEFT++;
+					if (KEY_LEFT == INPUT_FRAMES-1) { wantX--; KEY_LEFT = 0; }
+					else if (!KEY_LEFT) wantX--;
+				}
+				else if (KEY_LEFT > -1) KEY_LEFT = -1;
+				// right
+				if (GetAsyncKeyState(VK_RIGHT) & 0x8000) {
+					KEY_RIGHT++;
+					if (KEY_RIGHT == INPUT_FRAMES-1) { wantX++; KEY_RIGHT = 0; }
+					else if (!KEY_RIGHT) wantX++;
+				}
+				else if (KEY_RIGHT > -1) KEY_RIGHT = -1;
+			#else
+				#error "Soooo what are we doing"
+			#endif
+		}
 		if (QUIT) break;
 		
 		// bounds checking
 		int testX = PLAYER.x + wantX;
 		int testY = PLAYER.y + wantY;
 		
-		if (testY >= MAP_Y) wantY = 0;
-		if (testY < 0     ) wantY = 0;
-		if (testX >= MAP_X) wantX = 0;
-		if (testX < 0     ) wantX = 0;
+		if (testY >= MAP_Y) { wantY = 0; testY = MAP_Y-1; }
+		if (testY < 0     ) { wantY = 0; testY = 0; }
+		if (testX >= MAP_X) { wantX = 0; testX = MAP_X-1; }
+		if (testX < 0     ) { wantX = 0; testX = 0; }
 		
 		if ((wantY || wantX) && (MAP[testY][testX] != ' ')) {
 			// still wanna go? lets see what yo dumbass run into
-			if (MAP[testY][testX] == 'X') { 
+			if (MAP[testY][testX] == 'X') {
 				wantX = 0;
 				wantY = 0;
 			}
@@ -986,7 +1047,7 @@ int main() {
 			else if (MAP[testY][testX] == 'k') {
 				// key!
 				for (int i = 0; i < (int)KEY_LOOKUP.size(); ++i) {
-					if (KEY_LOOKUP[i].first == PLAYER.zone) {
+					if ((KEY_LOOKUP[i].first == PLAYER.zone) && (KEY_LOOKUP[i].second != -1)) {
 						PLAYER.inventory |= KEY_LOOKUP[i].second;
 						// set the key value to -1 so it knows that key has been acquired
 						KEY_LOOKUP[i].second = -1;
@@ -994,7 +1055,15 @@ int main() {
 				}
 			}
 			else if (MAP[testY][testX] == 'c') {
-				// ...
+				// coin!
+				// check if the coins been collected already
+				int z = 0;
+				for (; z < static_cast<int>(ZONE_COINS.size()); ++z) 
+					if (ZONE_COINS[z].first == PLAYER.zone) break;
+				if (ZONE_COINS[z].second) {
+					PLAYER.coins++;
+					ZONE_COINS[z].second = false;
+				}
 			}
 			else {
 				// running into something i havent accounted for? you cant!
@@ -1006,10 +1075,10 @@ int main() {
 		PLAYER.y += wantY;
 		
 		// put ents and player on map
-		// ... aaand update the ents because why not
+		// ... and update the ents
 		// possible optimization: dont check for self when checking possible directions
 		bool killedPlayer = false;
-		for (int i = 0; i < (int)ENTS.size(); ++i) {
+		for (int i = 0; i < static_cast<int>(ENTS.size()); ++i) {
 			if (!(framecounter % ENTS[i].moveDelay)) {
 				// it is time to move lil bro
 				
@@ -1105,12 +1174,12 @@ int main() {
 						newMoves++;
 					}
 				}
-				if ((ENTS[i].aggression) && newMoves && ((rand() % 4)+1 <= ENTS[i].aggression)) {
+				if (ENTS[i].aggression && newMoves && ((rand() % 4)+1 <= ENTS[i].aggression)) {
 					
 					// intense debugging occured here.
 					// because i mixed up X and Y.
 					
-					debugText << Colors::reset;
+					if (DEBUG_INFO) debugText << Colors::reset;
 					
 					memcpy(directions,aggrDir,sizeof(directions));
 					moves = newMoves;
@@ -1170,6 +1239,7 @@ int main() {
 					std::pair<int,int> coords = checkpointLookup(PLAYER.zone);
 					PLAYER.x = coords.first;
 					PLAYER.y = coords.second;
+					PLAYER.coins /= 2;
 					killedPlayer = true;
 					loadMap(PLAYER);
 				}
@@ -1178,7 +1248,7 @@ int main() {
 		if (killedPlayer) continue; // just in case!
 		MAP[PLAYER.y][PLAYER.x] = PLAYER.blit;
 		
-		std::cout << debugText.str();
+		if (DEBUG_INFO) std::cout << debugText.str();
 		
 		// blit the map
 		LOOP(MAP_X+2) std::cout << 'X';
@@ -1201,6 +1271,12 @@ int main() {
 						std::cout << Colors::red_boldHighIntensity;
 						break;
 					case 'c':
+						for (int z = 0; z < static_cast<int>(ZONE_COINS.size()); ++z) {
+							if ((!ZONE_COINS[z].second) && (ZONE_COINS[z].first == PLAYER.zone)) {
+								noBlit = true;
+								break;
+							}
+						}
 						std::cout << Colors::yellow_bold << Colors::yellow_underline;
 						break;
 					case 'N': case 'E': case 'S': case 'W': {
@@ -1218,7 +1294,7 @@ int main() {
 					// KEY!
 					case 'k':
 						// key!
-						for (int i = 0; i < (int)KEY_LOOKUP.size(); ++i) {
+						for (int i = 0; i < static_cast<int>(KEY_LOOKUP.size()); ++i) {
 							if (KEY_LOOKUP[i].first == PLAYER.zone) {
 								if (KEY_LOOKUP[i].second == -1) {
 									noBlit = true;
@@ -1235,12 +1311,14 @@ int main() {
 						break;
 				}
 				// PLAYER.blit is not constant so cant have it in switch
+				// yeah coming back to this... player.blit is lookin pretty constant
 				if (blit == PLAYER.blit) {
 					std::cout << Colors::green_boldHighIntensity;
 					changed = true;
 				}
 				
 				if (!noBlit) std::cout << MAP[i][x];
+				else std::cout << Colors::reset << ' ';
 				if (changed) std::cout << Colors::reset;
 			}
 			
@@ -1303,10 +1381,17 @@ int main() {
 			<< ((PLAYER.inventory & 0b0001000000000000) ? (Colors::green_background) : (Colors::red_background)) << 'E' << Colors::reset << ' '
 			<< ((PLAYER.inventory & 0b0000100000000000) ? (Colors::green_background) : (Colors::red_background)) << 'F' << Colors::reset << ' '
 			<< ((PLAYER.inventory & 0b0000010000000000) ? (Colors::green_background) : (Colors::red_background)) << 'G' << Colors::reset << ' '
-			<< ((PLAYER.inventory & 0b0000000011110000) ? (Colors::green_background) : (Colors::red_background)) << '?'
+			<< ((PLAYER.inventory & 0b0000000010000000) ? (Colors::green_background) : (Colors::red_background)) << '?' << Colors::reset
+			<< ((PLAYER.inventory & 0b0000000001000000) ? (Colors::green_background) : (Colors::red_background)) << '?' << Colors::reset
+			<< ((PLAYER.inventory & 0b0000000000100000) ? (Colors::green_background) : (Colors::red_background)) << '?' << Colors::reset
+			<< ((PLAYER.inventory & 0b0000000000010000) ? (Colors::green_background) : (Colors::red_background)) << '?' << Colors::reset
 			<< Colors::reset << '\n';
+
+		// show coins
+		// DEBUG: flushing the input buffer here, randomly. needed?
+		std::cout << "COINS: " << Colors::yellow_underline << PLAYER.coins << Colors::reset << std::endl;
 			
-		if (DEBUG_INFO || 1) std::cout
+		if (DEBUG_INFO) std::cout
 			<< PLAYER.x
 			<< ","
 			<< PLAYER.y
@@ -1332,6 +1417,7 @@ int main() {
 	#ifdef _WIN32
 		clear(1);
 		ShowConsoleCursor(true);
+		// didnt i mess with the terminal settings? shouldnt i change them back?
 	#else
 		// set terminal back
 		system("setterm -cursor on");
@@ -1339,4 +1425,3 @@ int main() {
 	#endif
 	return 0;
 }
-// rin!
